@@ -13,6 +13,10 @@
 #
 # --no-install 是给打包/CI 用的：GitHub Actions 的 runner 上 `launchctl bootstrap`
 # 会失败，而这个脚本是 set -e，失败会中断整个构建，出不了包。
+#
+# 签名：钥匙串里有「MacToAndroid Local Signing」证书就用它，否则 ad-hoc。
+# macOS 的通知、菜单栏显示等授权认的是签名，ad-hoc 每次构建都不同，
+# 用固定证书签，更新后这些授权才不会丢。设 SIGN_IDENTITY 可换用别的证书。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -184,7 +188,17 @@ if [ "$SWIFT_OK" -eq 1 ] && command -v swiftc >/dev/null 2>&1; then
 </dict>
 </plist>
 PLIST
-		codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
+		SIGN_ID="${SIGN_IDENTITY:-}"
+		if [ -z "$SIGN_ID" ] && security find-certificate -c "MacToAndroid Local Signing" >/dev/null 2>&1; then
+			SIGN_ID="MacToAndroid Local Signing"
+		fi
+		# 指定了证书却签不上要报错退出，不能悄悄退回 ad-hoc：那样发出去的包会让用户更新后重新授权
+		if [ -n "$SIGN_ID" ]; then
+			codesign --force --deep -s "$SIGN_ID" "$APP"
+		else
+			codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
+		fi
+		echo "签名: ${SIGN_ID:-ad-hoc}"
 		touch "$APP"
 		if [ "$BUILD_ONLY" -eq 1 ]; then
 			echo "已生成 App: $APP"

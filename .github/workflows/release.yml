@@ -4,6 +4,12 @@
 # 推到 main 或开 PR 就构建、自检，产物挂在这次运行的 Artifacts 里；
 # 推 v* 标签时额外发 Release。不想用 CI 的话删掉这个文件即可，
 # release.sh 在本地一样能跑完全套。
+#
+# 签名：仓库 Secrets 里放「MacToAndroid Local Signing」证书，每个版本签名就一致，
+# 用户更新后不用重新授权：
+#   SIGNING_CERT_P12           证书连同私钥导出的 .p12，base64 编码（base64 -i cert.p12）
+#   SIGNING_CERT_P12_PASSWORD  导出时设的密码
+# 没有这两个 Secret（比如外部仓库发来的 PR）时退回 ad-hoc 签名。
 name: release
 
 on:
@@ -37,6 +43,23 @@ jobs:
             echo "标签 v$TAG 与 build.sh 里的 VERSION=$VERSION 不一致" >&2
             exit 1
           fi
+
+      - name: 导入签名证书
+        env:
+          P12: ${{ secrets.SIGNING_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_CERT_P12_PASSWORD }}
+        run: |
+          if [ -z "$P12" ]; then echo "::warning::Secrets 里没有签名证书，改用 ad-hoc 签名"; exit 0; fi
+          kc="$RUNNER_TEMP/signing.keychain-db"; pw=$(uuidgen)
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$pw" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$pw" "$kc"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$pw" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          echo "SIGN_IDENTITY=MacToAndroid Local Signing" >> "$GITHUB_ENV"
 
       - name: 构建并打包
         run: ./release.sh

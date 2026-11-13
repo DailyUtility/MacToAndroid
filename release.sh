@@ -118,7 +118,7 @@ brew install --cask android-platform-tools
 
 **2. 解压后把 MacToAndroid.app 拖进「应用程序」**
 
-这个 App 只做了 ad-hoc 签名、没有经过 Apple 公证（公证需要每年 99 美元的开发者账号），
+这个 App 用的是自签名证书、没有经过 Apple 公证（公证需要每年 99 美元的开发者账号），
 所以首次打开会被系统拦下，提示「无法打开，因为无法验证开发者」。
 
 最省事的做法是先去掉隔离标记再打开：
@@ -211,7 +211,7 @@ cask "mactoandroid" do
   ]
 
   caveats <<~CAVEATS
-    本应用只做了 ad-hoc 签名、未经 Apple 公证，而 Homebrew 默认会给下载的应用
+    本应用用的是自签名证书、未经 Apple 公证，而 Homebrew 默认会给下载的应用
     加隔离标记，所以首次打开仍会被 Gatekeeper 拦下。去掉标记即可：
 
       xattr -dr com.apple.quarantine "#{appdir}/MacToAndroid.app"

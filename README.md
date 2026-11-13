@@ -44,7 +44,7 @@ brew install --cask --no-quarantine mactoandroid
 
 到 [Releases](https://github.com/daily-units/MacToAndroid/releases) 下载 `MacToAndroid-<版本>.zip`，
 解压后拖进「应用程序」。**第一次打开会被系统拦住**，提示「无法打开，因为无法验证开发者」
-——这个 App 只做了 ad-hoc 签名、没有经过 Apple 公证（公证需要每年 99 美元的开发者账号）。
+——这个 App 用的是自签名证书、没有经过 Apple 公证（公证需要每年 99 美元的开发者账号）。
 
 最省事的做法是先去掉隔离标记，再正常双击：
 
@@ -67,6 +67,14 @@ xattr -dr com.apple.quarantine "/Applications/MacToAndroid.app"
 
 需要 `swiftc`（Xcode 或 Command Line Tools，`xcode-select --install`）。
 本地编译出来的 App 不带隔离标记，上面那一步整个可以跳过。
+
+**签名。** macOS 的通知、菜单栏显示等授权认的是 App 的签名。默认是 ad-hoc 签名，
+每次构建都不一样，重新构建后这些授权可能要再给一次。想避免的话，在「钥匙串访问」里
+（**证书助理 → 创建证书**，类型选**代码签名**）建一张名为 `MacToAndroid Local Signing`
+的自签名证书，`build.sh` 找到它就会自动使用；设 `SIGN_IDENTITY` 可换用别的证书。
+GitHub Actions 发版用的是同一张证书（仓库 Secrets `SIGNING_CERT_P12` 和
+`SIGNING_CERT_P12_PASSWORD`，见 `.github/workflows/release.yml`），所以每个版本签名一致，
+用户更新后不用重新授权。
 
 `build.sh` 出的是 **arm64 + x86_64 通用二进制**（两个架构分别编再 `lipo` 合并）。
 只编本机架构的话，Intel Mac 拿到会直接报「应用程序不支持此 Mac」，
